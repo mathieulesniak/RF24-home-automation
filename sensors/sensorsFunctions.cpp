@@ -9,8 +9,7 @@
 
 #include "sensorsFunctions.h"
 
-// Fonction récupérant la température depuis le DS18B20
-// Retourne true si tout va bien, ou false en cas d'erreur
+// Based upon http://skyduino.wordpress.com/2012/04/26/arduino-capteur-de-temperature-ds18b20/
 bool sensorTemperature(uint16_t *temp)
 {
     OneWire ds(pinTemperature); // Création de l'objet OneWire ds
