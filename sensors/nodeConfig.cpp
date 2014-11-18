@@ -1,7 +1,7 @@
 #include <avr/pgmspace.h>
 #include <avr/eeprom.h>
 #include <Arduino.h>
-#include "eeprom_update_block.h";
+#include "eepromUpdateBlock.h";
 #include "nodeConfig.h"
 
 String readConsoleData = "";
