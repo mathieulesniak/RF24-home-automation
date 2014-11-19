@@ -5,7 +5,8 @@
 
 #include "printf.h"
 #include "nodeConfig.h"
-#include "sensorsFunctions.h";
+#include "sensorsFunctions.h"
+#include "sleep.h"
 
 
 #ifdef VERSION_H
@@ -25,13 +26,10 @@ RF24 radio(9, 10);
 // Network uses that radio
 RF24Network network(radio);
 
-// How often to send 'hello world to the other unit
-const unsigned long interval = 2000; //ms
+
 
 uint32_t failedPacketCounter = 0;
-// When did we last send?
-unsigned long last_sent;
-
+uint32_t sentPacketCounter   = 0;
 
 
 
@@ -54,6 +52,7 @@ void setup() {
   
   printf_P(PSTR("---------------------------------\n"));
   
+  sleepSetup(sleepTimer, sleepCyclesBetweenTransmit);
   SPI.begin();
   radio.begin();
   radio.startListening();
@@ -66,38 +65,21 @@ void setup() {
 
 // loop()
 void loop() {
-  static uint32_t sentPacketCounter   = 0;
-  
-
-  if (Serial.available()) {
-    char c = Serial.read();
-    if (c == '@') {
-      nodeConfigListen(&myNode);
+    if (Serial.available()) {
+      char c = Serial.read();
+      if (c == '@') {
+        nodeConfigListen(&myNode);
+      }
     }
-  }
 
+    network.update();
 
-  network.update();
+    byte batteryPercentage;
 
-  byte nodeId = 1;
-  float temp;
-  float pression;
-  byte batteryPercentage;
-  
-  unsigned long now = millis();
-  
-
-  
-  if (now - last_sent > interval) {
-
-    last_sent = now;
     sensorBatteryLevel(&batteryPercentage);
-    payload_t payload = {sentPacketCounter++, failedPacketCounter, batteryPercentage, temp, 0, 0};
+    payload_t payload = {sentPacketCounter++, failedPacketCounter, batteryPercentage};
     
     assignPayloadSensorValue(&myNode, &payload);
-    
-
-    
     
     printf_P(PSTR("Sending packet #%i (%s) : "), sentPacketCounter, strPacketContent(payload));
     printf_P(PSTR("TT : %s"), strPacketContent(payload));
@@ -116,7 +98,12 @@ void loop() {
       delay(250); // extra delay on fail to keep light on longer
     }
    
-  }
+  
+  printf_P(PSTR("Going to sleep\n"));
+  Serial.flush();
+  radio.powerDown();
+  goToSleep();
+  
 }
 
 char* strPacketContent(payload_t payload)
