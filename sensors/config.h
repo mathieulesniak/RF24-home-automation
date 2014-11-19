@@ -7,5 +7,7 @@ const int pinBattery      = A0;  // select the input pin for the battery sense p
 const int pinRfCse        = 9;
 const int pinRfCsn        = 10;
 
+const uint8_t sleepTimer    = 9; // 4s per sleep cycle
+const uint8_t sleepCyclesBetweenTransmit = 2; //sleepTimer * sleepCyclesBetweenTransmit = total between 2 transmissions
 
 #endif
