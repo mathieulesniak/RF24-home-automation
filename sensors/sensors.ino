@@ -1,10 +1,10 @@
 #include "config.h"
-#include <RF24Network.h>
 #include <RF24.h>
 #include <SPI.h>
 
 #include "printf.h"
 #include "nodeConfig.h"
+#include "message.h"
 #include "sensorsFunctions.h"
 #include "sleep.h"
 
@@ -16,16 +16,15 @@ const char program_version[] = "Unknown";
 #endif
 
 
-nodeEepromConfig myNode;
+nodeEepromConfig myNodeConfig;
+ 
 
 
+#define WRITE_PIPE  ((uint8_t)0)
+#define READ_PIPE   ((uint8_t)1)
 
 
-
-RF24 radio(9, 10);
-// Network uses that radio
-RF24Network network(radio);
-
+RF24 radio(pinRfCse, pinRfCsn);
 
 
 uint32_t failedPacketCounter = 0;
@@ -40,86 +39,78 @@ void setup() {
   Serial.begin(57600); // Initialisation du port série
   printf_begin();
 
-  nodeConfigInit(&myNode);
+  nodeConfigInit(&myNodeConfig);
 
   printf_P(PSTR("\n---------------------------------\n"));
   printf_P(PSTR("SENSOR NODE VERSION: %s\n"), program_version);
-  nodeConfigRead(&myNode);
-  printf_P(PSTR("| NodeId: %i\n"), myNode.nodeId);
+  nodeConfigRead(&myNodeConfig);
+  printf_P(PSTR("| NodeId: %i\n"), myNodeConfig.nodeId);
   for (int i = 0; i < 3; i++) {
-    printf_P(PSTR("| Role %i: %s\n"), i+1, nodeGetRoleFromInt(myNode.role[i]));
+    printf_P(PSTR("| Role %i: %s\n"), i+1, nodeGetRoleFromInt(myNodeConfig.role[i]));
   }
   
   printf_P(PSTR("---------------------------------\n"));
   
   sleepSetup(sleepTimer, sleepCyclesBetweenTransmit);
   SPI.begin();
+  
   radio.begin();
+  radio.setAutoAck(true);
+  radio.setChannel(RF24_CHANNEL);
+  radio.setDataRate(RF24_DATARATE);
+  radio.openWritingPipe(TO_ADDR(0));
+
+  radio.openReadingPipe(READ_PIPE, TO_ADDR(myNodeConfig.nodeId));
   radio.startListening();
 
   radio.printDetails();
- 
-  network.begin(/*channel*/ 90, /*node address*/ myNode.nodeId);
-  
 }
 
-// loop()
+void wakeUp ()
+{
+   // detachInterrupt(0);
+
+}
+
 void loop() {
+    //attachInterrupt(0, wakeUp, LOW);
     if (Serial.available()) {
       char c = Serial.read();
       if (c == '@') {
-        nodeConfigListen(&myNode);
+        nodeConfigListen(&myNodeConfig);
       }
     }
 
-    network.update();
+    sensorMessagePayload payload = {myNodeConfig.nodeId, sentPacketCounter++, failedPacketCounter};
+    
+    assignPayloadSensorValue(&myNodeConfig, &payload);
 
-    byte batteryPercentage;
+    
+    if (sendMessage(0, &payload, radio)) {
+        failedPacketCounter = 0;
 
-    sensorBatteryLevel(&batteryPercentage);
-    payload_t payload = {sentPacketCounter++, failedPacketCounter, batteryPercentage};
-    
-    assignPayloadSensorValue(&myNode, &payload);
-    
-    printf_P(PSTR("Sending packet #%i (%s) : "), sentPacketCounter, strPacketContent(payload));
-    printf_P(PSTR("TT : %s"), strPacketContent(payload));
-    
+        // Wait here until we get a response, or timeout (250ms)
+        unsigned long started_waiting_at = millis();
+        bool timeout = false;
+        while (!radio.available() && !timeout) {
+            if (millis() - started_waiting_at > 200 ) {
+                timeout = true;
+            }
+        }
 
-    RF24NetworkHeader header(0);
-    bool ok = network.write(header, &payload, sizeof(payload_t));
-    
-    if (ok) {
-      printf_P(PSTR("OK\n\r"));
-      failedPacketCounter = 0;
+        // Describe the results
+        if (!timeout) {
+           // got a message from base, parse it
+        }
+
     } else {
-      printf_P(PSTR("Failed\n\r"));
-      failedPacketCounter++;
-      printf_P(PSTR("NOW FAILED : %d"), failedPacketCounter);
-      delay(250); // extra delay on fail to keep light on longer
+        printf_P(PSTR("Failed\n"));
+        failedPacketCounter++;
     }
-   
   
-  printf_P(PSTR("Going to sleep\n"));
-  Serial.flush();
-  radio.powerDown();
-  goToSleep();
-  
+    printf_P(PSTR("Going to sleep\n"));
+    Serial.flush();
+    radio.powerDown();
+    goToSleep();
 }
 
-char* strPacketContent(payload_t payload)
-{
-  char buffer[100];
-  sprintf(
-    buffer,
-    "PACKET : %lu %lu %i %i %i %i",
-    payload.sentPacketCounter,
-    payload.failedPacketCounter,
-    payload.batteryPercentage,
-    payload.sensor[0],
-    payload.sensor[1],
-    payload.sensor[2]
-    );
-  printf_P(PSTR("DEBUG:%s"), buffer);
-  Serial.println(payload.sensor[0]);
-  return buffer;
-}

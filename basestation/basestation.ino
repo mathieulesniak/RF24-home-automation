@@ -2,17 +2,24 @@
 #include <RF24.h>
 #include <RF24_config.h>
 
-#include <RF24Network.h>
-#include <RF24Network_config.h>
+
 #include <Sync.h>
 #include "printf.h"
 #include "config.h"
 #include <SPI.h>
 
+#define WRITE_PIPE  ((uint8_t)0)
+#define READ_PIPE   ((uint8_t)1)
+
+
+#define TO_ADDR(x) (RF24_BASE_RADIO_ID + x)
+
+
 RF24 radio(pinRfCse,pinRfCsn);
 
-struct payload_t      // 32 bytes max
+struct sensorMessagePayload      // 32 bytes max
 { 
+    uint8_t messageFrom;
     uint32_t sentPacketCounter;
     uint32_t failedPacketCounter;
     byte batteryPercentage;      // 1 byte
@@ -20,26 +27,21 @@ struct payload_t      // 32 bytes max
 };
 
 
-// Network uses that radio
-RF24Network network(radio);
-
-// Address of our node
-const uint16_t this_node = 0;
 
 
 void getRadioData()
 {
-    RF24NetworkHeader header;
     static char floatBuffer[15];
 
-    payload_t payload;
+    sensorMessagePayload payload;
     bool done = false;
 
     while (!done) {
-      done =  network.read(header, &payload, sizeof(payload));
+      done =  radio.read(&payload, sizeof(payload));
     }
 
-    printf_P(PSTR("Received packet from node : %i\n"), header.from_node);
+
+    printf_P(PSTR("Received packet from node : %i\n"), payload.messageFrom);
     printf_P(PSTR("Packet #%i\n"), payload.sentPacketCounter);
     printf_P(PSTR("Failed : %i\n"), payload.failedPacketCounter);
     printf_P(PSTR("- Battery : %i\n"), payload.batteryPercentage);
@@ -47,7 +49,22 @@ void getRadioData()
     for (int i = 0; i < 3; i++) {
         dtostrf(payload.sensor[i] / 100.00 ,8, 2, floatBuffer);
         printf_P(PSTR("- SENSOR %i : %s\n"), i, floatBuffer);
-     }
+    }
+    /*
+        // First, stop listening so we can talk
+        radio.stopListening();
+        uint8_t zz = 22;
+        RF24NetworkHeader headerAnswer(header.from_node);
+        bool ok = network.write(headerAnswer, &zz, sizeof(zz));
+        if (ok) {
+            printf("Sent response.\n\r");
+        } else {
+            printf("Failed send response\n");
+        }
+
+        // Now, resume listening so we catch the next packets.
+        radio.startListening();
+    */
 
 }
 
@@ -60,19 +77,22 @@ void setup(void)
     
     SPI.begin();
     radio.begin();
+    radio.setAutoAck(true);
+    radio.setChannel(90);
+    radio.setDataRate(RF24_DATARATE);
+    radio.openReadingPipe(READ_PIPE, TO_ADDR(0));
+   // radio.openReadingPipe(WRITE_PIPE, TO_ADDR(0));
+    radio.printDetails();
     radio.startListening();
 
-    network.begin(/*channel*/ 90, /*node address*/ this_node);
+
+
+    //network.begin(/*channel*/ 90, /*node address*/ this_node);
 }
 
 void loop(void)
 {
-
-    // Pump the network regularly
-    network.update();
-  
-    // Is there anything ready for us?
-    while (network.available()) {
-      getRadioData();
+    if (radio.available()) {
+        getRadioData();
     }
 }
