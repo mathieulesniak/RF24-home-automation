@@ -7,6 +7,18 @@
 String readConsoleData = "";
 byte currentCommand = 0;
 
+const char* nodeRoleStr[] = 
+{
+    "None",
+    "Temperature",
+    "Opening",
+    "Humidity",
+    "Light sensor",
+    "Motion",
+    "Rain",
+    "Pressure"
+};
+
 
 void nodeConfigListen(nodeEepromConfig* myNode)
 {
@@ -84,35 +96,13 @@ void nodeConfigInit(nodeEepromConfig* myNode)
     }
 }
 
-char* nodeGetRoleFromInt(uint8_t nodeRole)
+void nodeConfigErase()
 {
-    switch (nodeRole) {
-        case ROLE_NONE:
-            return "NONE";
-            break;
-        case ROLE_TEMPERATURE:
-            return "TEMPERATURE";
-            break;
-        case ROLE_OPENING:
-            return "OPENING";
-            break;
-        case ROLE_HUMIDITY:
-            return "HUMIDITY";
-            break;
-        case ROLE_LIGHT:
-            return "LIGHT";
-            break;
-        case ROLE_MOTION:
-            return "MOTION";
-            break;
-        case ROLE_RAIN:
-            return "RAIN";
-            break;
-        case ROLE_PRESSURE:
-            return "PRESSURE";
-            break;
-        default:
-            return "UNKNOWN ROLE";
-            break;
-    }
+    eeprom_write_block(0, EEPROM_CONFIG_ADDRESS, sizeof(nodeEepromConfig));
 }
+
+const char* nodeGetRoleFromInt(uint8_t nodeRole)
+{
+    return nodeRoleStr[nodeRole];
+}
+

@@ -8,10 +8,12 @@ enum nodeRole
     ROLE_NONE, ROLE_TEMPERATURE, ROLE_OPENING, ROLE_HUMIDITY, ROLE_LIGHT, ROLE_MOTION, ROLE_RAIN, ROLE_PRESSURE, ROLE_END
 };
 
+
 struct nodeEepromConfig
 {
     uint8_t nodeId;
     uint8_t role[3];
+    uint8_t sleepDuration;
     
     bool isValid()
     {
@@ -28,6 +30,6 @@ struct nodeEepromConfig
 void nodeConfigListen(nodeEepromConfig *nodeConfig);
 void nodeConfigRead(nodeEepromConfig *nodeConfig);
 void nodeConfigInit(nodeEepromConfig *nodeConfig);
-char* nodeGetRoleFromInt(uint8_t roleId);
+const char* nodeGetRoleFromInt(uint8_t roleId);
 
 #endif
