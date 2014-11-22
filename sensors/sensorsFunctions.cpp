@@ -3,11 +3,14 @@
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BMP085_U.h>
-
+#include <RF24.h>
 #include "config.h"
 #include "nodeConfig.h"
+#include "message.h"
 
 #include "sensorsFunctions.h"
+
+
 
 // Based upon http://skyduino.wordpress.com/2012/04/26/arduino-capteur-de-temperature-ds18b20/
 bool sensorTemperature(uint16_t *temp)
@@ -100,7 +103,7 @@ bool sensorPressure()
 
 }
 
-void assignPayloadSensorValue(nodeEepromConfig* nodeConfig, payload_t* payload)
+void assignPayloadSensorValue(nodeEepromConfig* nodeConfig, sensorMessagePayload* payload)
 {
     for (uint8_t i = 0; i < sizeof(nodeConfig->role); i++) {
         switch (nodeConfig->role[i]) {
@@ -124,4 +127,6 @@ void assignPayloadSensorValue(nodeEepromConfig* nodeConfig, payload_t* payload)
 
         }
     }
+
+    sensorBatteryLevel(&payload->batteryPercentage);
 }
